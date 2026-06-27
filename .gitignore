@@ -1,0 +1,9 @@
+node_modules/
+out/
+dist/
+*.log
+.DS_Store
+Thumbs.db
+# Electron 本地存档（不提交到仓库）
+saves/
+*.backup.*.json
