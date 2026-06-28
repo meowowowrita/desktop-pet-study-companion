@@ -1,0 +1,29 @@
+{
+  "original_size": [
+    1024,
+    1024
+  ],
+  "has_alpha": true,
+  "cropped_size": [
+    713,
+    803
+  ],
+  "canvas_size": [
+    512,
+    512
+  ],
+  "pixel_size": [
+    512,
+    512
+  ],
+  "center_of_mass_x": 251.5,
+  "center_of_mass_y": 282.0,
+  "character_area_percent": 16.3,
+  "transparency_percent": 83.7,
+  "edge_touch_percent": 0.0,
+  "actual_color_count": 24,
+  "edge_top": false,
+  "edge_bottom": false,
+  "edge_left": false,
+  "edge_right": false
+}

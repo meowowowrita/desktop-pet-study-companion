@@ -1,8 +1,9 @@
-import { useRef, useEffect, useState } from 'react'
+import { useState, useCallback } from 'react'
 import type { PetInstance, PetStatus } from '@shared/types'
 
 interface Props {
   pet: PetInstance
+  actionOverride?: string | null
 }
 
 function getVideoState(status: PetStatus): string {
@@ -21,89 +22,83 @@ const SPECIES_EMOJI: Record<string, string> = {
   alpaca: '🦙', dragon: '🐲', snow_leopard: '🐆', phoenix: '🐦‍🔥', unicorn: '🦄',
 }
 
-export default function PetSprite({ pet }: Props) {
-  const videoRef = useRef<HTMLVideoElement>(null)
+/** 素材类型探测顺序 */
+type AssetType = 'gif' | 'mp4'
+
+export default function PetSprite({ pet, actionOverride }: Props) {
+  const [assetType, setAssetType] = useState<AssetType>('gif')  // 先试 GIF
+  const [gifFailed, setGifFailed] = useState(false)
   const [useFallback, setUseFallback] = useState(false)
-  const [debugMsg, setDebugMsg] = useState('')
+  const [currentSrc, setCurrentSrc] = useState('')  // video 的当前 src
 
   const { stage } = pet.growth
   const { speciesId } = pet
-  const videoState = getVideoState(pet.status)
-  const targetSrc = `asset://pets/${speciesId}/${stage}/${videoState}.mp4`
-  const idleSrc = `asset://pets/${speciesId}/${stage}/idle.mp4`
+  const statusState = getVideoState(pet.status)
+  const effectiveState = actionOverride ?? statusState
 
-  useEffect(() => {
-    const video = videoRef.current
-    if (!video) return
-
-    setUseFallback(false)
-    setDebugMsg('加载中...')
-
-    const onError = (e: Event) => {
-      const v = e.target as HTMLVideoElement
-      const err = v.error
-      console.warn('[PetSprite] 视频错误:', err?.code, err?.message)
-      setDebugMsg(`错误: ${err?.code ?? 'unknown'}`)
-
-      // target 失败 → 回退到 idle
-      if (v.src === targetSrc) {
-        setDebugMsg('回退 idle...')
-        v.src = idleSrc
-        v.load()
-        v.play().catch(() => {})
-        return
-      }
-
-      // idle 也失败 → emoji 兜底
-      setDebugMsg('视频不可用，显示占位图')
-      setUseFallback(true)
-    }
-
-    const onLoaded = () => {
-      setDebugMsg(`播放中: ${videoState}`)
-      setUseFallback(false)
-      video.play().catch((e) => console.warn('[PetSprite] play() 失败:', e))
-    }
-
-    video.addEventListener('error', onError)
-    video.addEventListener('loadeddata', onLoaded)
-
-    video.src = targetSrc
-    video.load()
-
-    return () => {
-      video.removeEventListener('error', onError)
-      video.removeEventListener('loadeddata', onLoaded)
-    }
-  }, [targetSrc, idleSrc, videoState])
+  // 资源路径
+  const gifSrc = `asset://pets/${speciesId}/${stage}/${effectiveState}.gif`
+  const gifIdleSrc = `asset://pets/${speciesId}/${stage}/idle.gif`
+  const mp4Src = `asset://pets/${speciesId}/${stage}/${effectiveState}.mp4`
+  const mp4IdleSrc = `asset://pets/${speciesId}/${stage}/idle.mp4`
 
   const scale = stage === 'baby' ? 0.7 : stage === 'child' ? 0.85 : 1.0
   const emoji = SPECIES_EMOJI[speciesId] ?? '🐾'
 
+  // ── GIF 加载失败处理 ──
+  const handleGifError = useCallback(() => {
+    if (!gifFailed && effectiveState !== 'idle') {
+      // 先试 idle.gif
+      setGifFailed(true)
+    } else {
+      // idle.gif 也失败 → 切到 mp4
+      setAssetType('mp4')
+    }
+  }, [gifFailed, effectiveState])
+
+  // ── Video 加载失败处理 ──
+  const handleVideoError = useCallback((e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const v = e.target as HTMLVideoElement
+    const currentTarget = v.src.replace('asset://', '')
+
+    if (currentTarget === mp4Src && effectiveState !== 'idle') {
+      setCurrentSrc(mp4IdleSrc)
+    } else {
+      setUseFallback(true)
+    }
+  }, [mp4Src, mp4IdleSrc, effectiveState])
+
+  const handleVideoLoaded = useCallback(() => {
+    setUseFallback(false)
+  }, [])
+
+  // ── 渲染 ──
   return (
     <div className="pet-sprite" style={{ transform: `scale(${scale})` }}>
       {useFallback ? (
-        <div className="pet-sprite-fallback" style={{
-          fontSize: '80px', textAlign: 'center', lineHeight: '180px',
-        }}>
+        <div style={{ fontSize: '80px', textAlign: 'center', lineHeight: '180px' }}>
           {emoji}
         </div>
+      ) : assetType === 'gif' ? (
+        <img
+          src={gifFailed ? gifIdleSrc : gifSrc}
+          onError={handleGifError}
+          style={{
+            width: '100%', height: '100%', objectFit: 'contain',
+            imageRendering: 'pixelated',
+          }}
+          alt={effectiveState}
+        />
       ) : (
         <video
-          ref={videoRef}
-          loop
-          muted
-          autoPlay
-          playsInline
+          key={currentSrc || mp4Src}
+          src={currentSrc || mp4Src}
+          loop muted autoPlay playsInline
+          onError={handleVideoError}
+          onLoadedData={handleVideoLoaded}
           style={{ width: '100%', height: '100%', objectFit: 'contain' }}
         />
       )}
-      <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        fontSize: '9px', color: '#999', textAlign: 'center',
-      }}>
-        {debugMsg}
-      </div>
     </div>
   )
 }

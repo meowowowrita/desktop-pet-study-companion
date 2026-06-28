@@ -1,12 +1,18 @@
 import { useState, useEffect, useRef } from 'react'
 import type { PetInstance, SaveData, InteractionResult } from '@shared/types'
-import { feedPet, bathePet, cleanPet, playWithPet } from '@shared/game/petState'
+import { bathePet, cleanPet, playWithPet } from '@shared/game/petState'
+import { useInventoryItem } from '@shared/game/inventory'
+import { getShopItem } from '@shared/data/items'
 
 interface Props {
   pet: PetInstance
   save: SaveData
   onSave: (s: SaveData) => void
   onOpenPanel: () => void
+  /** 当菜单动作即将执行时回调，用于触发临时动画覆盖 */
+  onActionRequest?: (action: string) => void
+  /** 当拖拽开始/结束时回调 */
+  onDragChange?: (dragging: boolean) => void
 }
 
 type MenuAction = 'feed' | 'bathe' | 'clean' | 'play' | 'focus' | 'panel'
@@ -20,7 +26,7 @@ const MENU_ITEMS: { id: MenuAction; icon: string; label: string }[] = [
   { id: 'panel', icon: '📋', label: '控制面板' },
 ]
 
-export default function QuickMenu({ pet, save, onSave, onOpenPanel }: Props) {
+export default function QuickMenu({ pet, save, onSave, onOpenPanel, onActionRequest, onDragChange }: Props) {
   const [open, setOpen] = useState(false)
   const [feedback, setFeedback] = useState('')
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 })
@@ -29,6 +35,7 @@ export default function QuickMenu({ pet, save, onSave, onOpenPanel }: Props) {
   const dragging = useRef(false)
   const dragStart = useRef({ x: 0, y: 0 })
   const hasMoved = useRef(false)
+  const dragNotified = useRef(false)
 
   // 全局鼠标事件（JS 拖动 + 右键菜单）
   useEffect(() => {
@@ -48,11 +55,19 @@ export default function QuickMenu({ pet, save, onSave, onOpenPanel }: Props) {
         hasMoved.current = true
         dragStart.current = { x: e.screenX, y: e.screenY }
         window.petApi.moveWindow(dx, dy)
+        if (!dragNotified.current) {
+          dragNotified.current = true
+          onDragChange?.(true)
+        }
       }
     }
 
     const onMouseUp = () => {
       dragging.current = false
+      if (dragNotified.current) {
+        dragNotified.current = false
+        onDragChange?.(false)
+      }
     }
 
     const onContextMenu = (e: MouseEvent) => {
@@ -80,27 +95,32 @@ export default function QuickMenu({ pet, save, onSave, onOpenPanel }: Props) {
 
     switch (action) {
       case 'feed': {
-        const foodItem = save.inventory.items.find(i => i.quantity > 0)
-        if (!foodItem) {
+        // 优先查找背包中 category 为 food/snack 且有库存的物品
+        const invEntry = save.inventory.items.find(i => {
+          const item = getShopItem(i.itemId)
+          return item && (item.category === 'food' || item.category === 'snack') && i.quantity > 0
+        })
+        if (!invEntry) {
           setFeedback('背包里没有食物，先去商店买吧！')
           setTimeout(() => setFeedback(''), 2000)
           setOpen(false)
           return
         }
-        result = feedPet(pet, { itemId: foodItem.itemId, effect: { hunger: 30 } })
-        foodItem.quantity -= 1
-        if (foodItem.quantity <= 0) {
-          save.inventory.items = save.inventory.items.filter(i => i.itemId !== foodItem.itemId)
-        }
+        onActionRequest?.('happy')
+        // 使用统一背包逻辑：应用 item.effect、扣库存、更新成长阶段
+        result = useInventoryItem(save, pet.id, invEntry.itemId)
         break
       }
       case 'bathe':
+        onActionRequest?.('happy')
         result = bathePet(pet)
         break
       case 'clean':
+        onActionRequest?.('happy')
         result = cleanPet(pet)
         break
       case 'play':
+        onActionRequest?.('playing')
         result = playWithPet(pet)
         break
       case 'focus':

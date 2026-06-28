@@ -1,10 +1,16 @@
 import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen, protocol, net } from 'electron'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
-import { createDefaultSaveData, todayDateString } from '../shared/defaults'
+import { createDefaultSaveData } from '../shared/defaults'
 import { loadSaveData, saveGameData, getSavePath } from './storage'
 import { createPet } from '../shared/game/petFactory'
-import { getCommonSpecies } from '../shared/data/species'
+import { getCommonSpecies, getSpecies } from '../shared/data/species'
+import {
+  performDailyRollover,
+  applyOfflineDecay,
+  updateGrowthStage,
+} from '../shared/game/lifecycle'
+import { TICK_INTERVAL_SECONDS } from '../shared/constants'
 import type { SaveData } from '../shared/types'
 
 // ---- 窗口引用 ----
@@ -123,8 +129,11 @@ function createTray() {
     {
       label: '打开控制面板',
       click: () => {
-        controlPanel?.show()
-        controlPanel?.focus()
+        if (!controlPanel) {
+          controlPanel = createControlPanel()
+        }
+        controlPanel.show()
+        controlPanel.focus()
       },
     },
     { type: 'separator' },
@@ -146,6 +155,21 @@ function createTray() {
 }
 
 // ============================================
+// 广播存档更新
+// ============================================
+
+/** 把最新的 gameSave 推送到所有已打开的渲染进程窗口 */
+function broadcastSaveUpdated() {
+  const payload = gameSave
+  if (petWindow && !petWindow.isDestroyed()) {
+    petWindow.webContents.send('game:saveUpdated', payload)
+  }
+  if (controlPanel && !controlPanel.isDestroyed()) {
+    controlPanel.webContents.send('game:saveUpdated', payload)
+  }
+}
+
+// ============================================
 // IPC 通信
 // ============================================
 
@@ -160,6 +184,7 @@ function setupIPC() {
     gameSave = newSave
     gameSave.timestamps.updatedAt = new Date().toISOString()
     saveGameData(gameSave)
+    broadcastSaveUpdated()
     return { ok: true }
   })
 
@@ -225,28 +250,54 @@ app.whenReady().then(() => {
   gameSave = loadSaveData() ?? createDefaultSaveData()
   gameSave.timestamps.lastOpenedAt = new Date().toISOString()
 
-  // 如果存档中的今日日期不是今天，重置今日统计
-  const today = todayDateString()
-  if (gameSave.focus.today.date !== today) {
-    gameSave.focus.today = {
-      date: today,
-      completedMinutes: 0,
-      sessionsCompleted: 0,
-      coinsEarned: 0,
-    }
-  }
+  // 每日重置：把旧日期的统计归入历史，重置 today
+  performDailyRollover(gameSave)
+
+  // 离线追赶：应用离线期间的时间衰减
+  applyOfflineDecay(gameSave)
 
   // 首次启动：送一只小猫（当前只有 cat 有视频素材）
   if (gameSave.pets.length === 0) {
     const starterPet = createPet(getCommonSpecies().find(s => s.id === 'cat')!)
     gameSave.pets.push(starterPet)
     gameSave.activePetId = starterPet.id
-    saveGameData(gameSave)
   }
+
+  // 启动时保存（包含每日重置和离线衰减后的状态）
+  saveGameData(gameSave)
 
   setupIPC()
   petWindow = createPetWindow()
   createTray()
+
+  // ---- 定时 tick 循环 ----
+  const tickIntervalMs =
+    (gameSave.settings.tickIntervalSeconds || TICK_INTERVAL_SECONDS) * 1000
+
+  setInterval(() => {
+    try {
+      // 1. 应用时间衰减（从上次 tick 到现在的经过时间）
+      applyOfflineDecay(gameSave)
+
+      // 2. 每日重置
+      performDailyRollover(gameSave)
+
+      // 3. 成长阶段检查（对当前活跃宠物）
+      const activePet = gameSave.pets.find(p => p.id === gameSave.activePetId)
+      if (activePet) {
+        const species = getSpecies(activePet.speciesId)
+        if (species) {
+          updateGrowthStage(activePet, species)
+        }
+      }
+
+      // 4. 保存
+      saveGameData(gameSave)
+      broadcastSaveUpdated()
+    } catch (err) {
+      console.error('[tick] 定时循环出错:', err)
+    }
+  }, tickIntervalMs)
 
   app.on('activate', () => {
     petWindow?.show()
@@ -320,11 +371,19 @@ function registerAssetProtocol() {
 
       // 无 Range 请求，返回完整文件
       const data = fs.readFileSync(absolutePath)
+      // 根据文件扩展名设置正确的 Content-Type（PNG/WebM/MP4 等）
+      const ext = absolutePath.split('.').pop()?.toLowerCase() ?? ''
+      const mimeMap: Record<string, string> = {
+        mp4: 'video/mp4', webm: 'video/webm',
+        png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+        gif: 'image/gif', json: 'application/json',
+      }
+      const contentType = mimeMap[ext] ?? 'video/mp4'
       return new Response(data, {
         status: 200,
         headers: {
           'Content-Length': String(fileSize),
-          'Content-Type': 'video/mp4',
+          'Content-Type': contentType,
           'Accept-Ranges': 'bytes',
         },
       })

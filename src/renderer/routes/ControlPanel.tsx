@@ -2,6 +2,9 @@ import { useState, useCallback } from 'react'
 import type { SaveData } from '@shared/types'
 import StatusPanel from '../components/StatusPanel'
 import FocusTimer from '../components/FocusTimer'
+import ShopPanel from '../components/ShopPanel'
+import InventoryPanel from '../components/InventoryPanel'
+import SettingsPanel from '../components/SettingsPanel'
 
 interface Props {
   save: SaveData
@@ -22,6 +25,8 @@ export default function ControlPanel({ save, onUpdateSave }: Props) {
   const [tab, setTab] = useState<TabId>('status')
   const lang = save.settings.language
   const pet = save.pets.find(p => p.id === save.activePetId)
+  const focusToday = save.focus.today.completedMinutes
+  const streak = save.user.currentStreakDays
 
   const persist = useCallback((newSave: SaveData) => {
     onUpdateSave(newSave)
@@ -30,24 +35,49 @@ export default function ControlPanel({ save, onUpdateSave }: Props) {
 
   return (
     <div className="control-panel">
-      {/* 顶部标题栏 */}
-      <header className="cp-header">
-        <h1>{lang === 'zh' ? '🎓 学习伴侣' : '🎓 Study Buddy'}</h1>
-        <div className="cp-header-coins">
-          💰 {save.economy.coins}
+      {/* 紧凑仪表盘头部 */}
+      <header className="cp-dashboard">
+        <div className="cp-dash-title">
+          <span className="cp-dash-icon">🎓</span>
+          <span className="cp-dash-name">
+            {lang === 'zh' ? '学习伴侣' : 'Study Buddy'}
+          </span>
+        </div>
+        <div className="cp-dash-stats">
+          <span className="cp-stat-pill cp-stat-coins" title={lang === 'zh' ? '金币' : 'Coins'}>
+            <span className="cp-stat-icon">💰</span>
+            <span className="cp-stat-val">{save.economy.coins}</span>
+          </span>
+          {pet && (
+            <span className="cp-stat-pill cp-stat-pet" title={lang === 'zh' ? '当前宠物' : 'Active Pet'}>
+              <span className="cp-stat-icon">🐾</span>
+              <span className="cp-stat-val">{pet.name}</span>
+            </span>
+          )}
+          <span className="cp-stat-pill cp-stat-focus" title={lang === 'zh' ? '今日专注' : 'Today Focus'}>
+            <span className="cp-stat-icon">⏱️</span>
+            <span className="cp-stat-val">{focusToday}{lang === 'zh' ? '分' : 'm'}</span>
+          </span>
+          {streak > 0 && (
+            <span className="cp-stat-pill cp-stat-streak" title={lang === 'zh' ? '连续天数' : 'Streak'}>
+              <span className="cp-stat-icon">🔥</span>
+              <span className="cp-stat-val">{streak}{lang === 'zh' ? '天' : 'd'}</span>
+            </span>
+          )}
         </div>
       </header>
 
-      {/* 标签页导航 */}
+      {/* 标签页导航 — 精简横向标签栏 */}
       <nav className="cp-tabs">
         {TABS.map(t => (
           <button
             key={t.id}
             className={`cp-tab ${tab === t.id ? 'active' : ''}`}
             onClick={() => setTab(t.id)}
+            title={lang === 'zh' ? t.label : t.labelEn}
           >
             <span className="cp-tab-icon">{t.icon}</span>
-            <span>{lang === 'zh' ? t.label : t.labelEn}</span>
+            <span className="cp-tab-label">{lang === 'zh' ? t.label : t.labelEn}</span>
           </button>
         ))}
       </nav>
@@ -61,19 +91,13 @@ export default function ControlPanel({ save, onUpdateSave }: Props) {
           <FocusTimer save={save} onSave={persist} />
         )}
         {tab === 'shop' && (
-          <div className="cp-placeholder">
-            <p>🛒 {lang === 'zh' ? '商店 — 即将开放' : 'Shop — Coming soon'}</p>
-          </div>
+          <ShopPanel save={save} onUpdateSave={persist} />
         )}
         {tab === 'inventory' && (
-          <div className="cp-placeholder">
-            <p>🎒 {lang === 'zh' ? '背包 — 即将开放' : 'Bag — Coming soon'}</p>
-          </div>
+          <InventoryPanel save={save} onUpdateSave={persist} />
         )}
         {tab === 'settings' && (
-          <div className="cp-placeholder">
-            <p>⚙️ {lang === 'zh' ? '设置 — 即将开放' : 'Settings — Coming soon'}</p>
-          </div>
+          <SettingsPanel save={save} onUpdateSave={persist} />
         )}
       </main>
     </div>

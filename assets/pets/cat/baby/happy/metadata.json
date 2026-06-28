@@ -1,0 +1,22 @@
+{
+  "species": "cat",
+  "state": "happy",
+  "stage": "baby",
+  "total_frames": 10,
+  "generated_frames": 10,
+  "failed_frames": 0,
+  "failed_indices": [],
+  "loop": true,
+  "description": "开心跳跃动画，活泼欢快的动作",
+  "canvas": {
+    "width": 512,
+    "height": 512,
+    "center_x": 256,
+    "foot_y": 420
+  },
+  "qa_summary": {
+    "total": 10,
+    "passed": 1,
+    "failed": 9
+  }
+}

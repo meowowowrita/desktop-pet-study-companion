@@ -13,6 +13,7 @@ interface PetApi {
   notify(title: string, body: string): Promise<boolean>
   getAssetPath(relativePath: string): Promise<string>
   onContextMenu(callback: (pos: { x: number; y: number }) => void): () => void
+  onSaveUpdated(callback: (save: SaveData) => void): () => void
   moveWindow(dx: number, dy: number): Promise<void>
 }
 

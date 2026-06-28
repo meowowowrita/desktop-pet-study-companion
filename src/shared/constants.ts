@@ -42,24 +42,42 @@ export const GROWTH_STAGES = {
   adult: { min: 300 },
 } as const
 
-/** 专注奖励 */
-export const FOCUS_COINS_PER_MINUTE = 1
-export const FOCUS_COMPLETION_BONUS_MINUTES = 25
-export const FOCUS_COMPLETION_BONUS_COINS = 5
+/** ── 专注奖励 ── */
 
-/** 连续学习倍率 */
-export const STREAK_MULTIPLIERS = [
-  { maxDays: 2, multiplier: 1.0 },
-  { maxDays: 6, multiplier: 1.1 },
-  { maxDays: 13, multiplier: 1.2 },
-  { maxDays: Infinity, multiplier: 1.3 },
+/** 分段费率：按今日累计分钟所在区间收取不同金币/分钟 */
+export const FOCUS_TIER_RATES = [
+  { startMinute: 0,   endMinute: 60,   rate: 0.25 },
+  { startMinute: 60,  endMinute: 120,  rate: 0.45 },
+  { startMinute: 120, endMinute: 240,  rate: 0.75 },
+  { startMinute: 240, endMinute: 300,  rate: 0.50 },
+  { startMinute: 300, endMinute: Infinity, rate: 0.15 },
 ]
 
-/** 每日收益上限 */
+/** 单次 session 完成奖励：至少专注 N 分钟才触发 */
+export const FOCUS_COMPLETION_BONUS_MINUTES = 25
+/** 单次 session 完成奖励金币（>= 25 分钟 +1） */
+export const FOCUS_COMPLETION_BONUS_COINS = 1
+
+/** 每日专注目标（分钟） */
+export const FOCUS_DAILY_TARGET_MINUTES = 240
+/** 首次达到每日目标奖励金币 */
+export const FOCUS_DAILY_TARGET_BONUS_COINS = 30
+
+/** 连续学习天数倍率（分段已内置衰减，连续倍率单独应用） */
+export const STREAK_MULTIPLIERS = [
+  { maxDays: 2,    multiplier: 1.0 },
+  { maxDays: 6,    multiplier: 1.05 },
+  { maxDays: 13,   multiplier: 1.10 },
+  { maxDays: Infinity, multiplier: 1.15 },
+]
+
+/** 每日收益上限说明（已改用 FOCUS_TIER_RATES 分段费率，本常量仅作参考） */
 export const DAILY_EARN_LIMITS = [
-  { maxMinutes: 120, rate: 1.0 },
-  { maxMinutes: 240, rate: 0.5 },
-  { maxMinutes: Infinity, rate: 0.2 },
+  { maxMinutes: 60,   rate: 0.25 },
+  { maxMinutes: 120,  rate: 0.45 },
+  { maxMinutes: 240,  rate: 0.75 },
+  { maxMinutes: 300,  rate: 0.50 },
+  { maxMinutes: Infinity, rate: 0.15 },
 ]
 
 /** 自动保存间隔（秒） */

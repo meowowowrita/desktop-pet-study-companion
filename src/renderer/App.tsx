@@ -22,6 +22,12 @@ export default function App() {
       setSave(data)
       setReady(true)
     })
+
+    // 订阅主进程推送的存档更新，保证多窗口之间状态同步
+    const unsubscribe = window.petApi.onSaveUpdated((data) => {
+      setSave(data)
+    })
+    return unsubscribe
   }, [])
 
   if (!ready || !save) {

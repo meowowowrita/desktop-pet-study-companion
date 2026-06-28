@@ -1,6 +1,6 @@
 {
   "name": "desktop-pet-study-companion",
-  "version": "0.1.0",
+  "version": "1.5.0",
   "description": "桌面宠物学习陪伴应用 — 用宠物的状态反馈，把学习转化为即时奖励和陪伴感",
   "main": "./out/main/index.js",
   "scripts": {

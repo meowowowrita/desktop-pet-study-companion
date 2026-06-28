@@ -1,0 +1,22 @@
+{
+  "species": "cat",
+  "state": "idle",
+  "stage": "baby",
+  "total_frames": 10,
+  "generated_frames": 10,
+  "failed_frames": 0,
+  "failed_indices": [],
+  "loop": true,
+  "description": "待机呼吸动画，微小的身体起伏和尾巴摆动",
+  "canvas": {
+    "width": 512,
+    "height": 512,
+    "center_x": 256,
+    "foot_y": 420
+  },
+  "qa_summary": {
+    "total": 10,
+    "passed": 1,
+    "failed": 9
+  }
+}

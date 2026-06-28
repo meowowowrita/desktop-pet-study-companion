@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import type { SaveData, FocusType, FocusSession } from '@shared/types'
 import { generateId } from '@shared/defaults'
 import { calcFocusReward } from '@shared/game/focus'
+import { performDailyRollover, recordFocusCompletion } from '@shared/game/lifecycle'
 
 interface Props {
   save: SaveData
@@ -102,22 +103,18 @@ export default function FocusTimer({ save, onSave }: Props) {
     if (!session) return
     session.status = 'completed'
 
-    const reward = calcFocusReward(session.plannedMinutes, save.user.currentStreakDays, save.focus.today.completedMinutes)
-    save.economy.coins += reward.coins
-    save.economy.lifetimeCoinsEarned += reward.coins
-    save.user.totalFocusMinutes += session.plannedMinutes
-    save.focus.today.completedMinutes += session.plannedMinutes
-    save.focus.today.sessionsCompleted += 1
-    save.focus.today.coinsEarned += reward.coins
+    // 先处理跨天重置，确保奖励计算使用今日的数据
+    performDailyRollover(save)
 
-    // 保存历史
-    save.focus.history.push({ ...save.focus.today })
+    // 计算奖励（使用当前 streak 和今日已完成分钟数）
+    const reward = calcFocusReward(
+      session.plannedMinutes,
+      save.user.currentStreakDays,
+      save.focus.today.completedMinutes,
+    )
 
-    // 成长点
-    const pet = save.pets.find(p => p.id === save.activePetId)
-    if (pet) {
-      pet.growth.growthPoints += (session.plannedMinutes >= 25 ? 8 : 2)
-    }
+    // 使用共享函数记录完成（金币、总分钟、今日统计、连续天数、成长点、成长阶段）
+    recordFocusCompletion(save, session.plannedMinutes, reward.coins)
 
     save.focus.activeSession = undefined
     onSave({ ...save })

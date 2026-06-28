@@ -42,6 +42,13 @@ const petApi = {
     return () => ipcRenderer.removeListener('show-context-menu', handler)
   },
 
+  /** 监听主进程发出的存档更新广播 */
+  onSaveUpdated: (callback: (save: SaveData) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, save: SaveData) => callback(save)
+    ipcRenderer.on('game:saveUpdated', handler)
+    return () => ipcRenderer.removeListener('game:saveUpdated', handler)
+  },
+
   /** JS 拖动：移动宠物窗口 */
   moveWindow: (dx: number, dy: number): Promise<void> =>
     ipcRenderer.invoke('ui:moveWindow', dx, dy),

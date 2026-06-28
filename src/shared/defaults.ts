@@ -58,7 +58,11 @@ export function createDefaultSaveData(): SaveData {
   }
 }
 
-/** 获取今天的日期字符串 YYYY-MM-DD */
+/** 获取今天的日期字符串 YYYY-MM-DD（使用本地时区，不是 UTC） */
 export function todayDateString(): string {
-  return new Date().toISOString().slice(0, 10)
+  const d = new Date()
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
